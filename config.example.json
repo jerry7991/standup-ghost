@@ -1,0 +1,86 @@
+{
+  "_comment": "Copy to ~/.config/standup-ghost/config.json (or let /standup-ghost:setup write it). Everything user-specific lives HERE, never in the repo.",
+
+  "identity": {
+    "_note": "Setup DISCOVERS these from your connected tools (gh api user / atlassianUserInfo / slack_search_users) — you confirm, you don't type IDs.",
+    "handle": "your.name",
+    "_handle_note": "Appears in the standup heading and is the per-person idempotency key on shared canvases. Defaults to your Slack display name.",
+    "email": "you@example.com",
+    "github_login": "your-github-login",
+    "github_org": "your-org",
+    "slack_user_id": "U00000000",
+    "_slack_user_id_note": "Used only for review-mode self-DM drafts.",
+    "timezone": "UTC"
+  },
+
+  "schedule": {
+    "days": [1, 2, 3, 4, 5],
+    "hour": 9,
+    "minute": 30,
+    "_note": "Local time. Changing this and re-running setup (or doctor) regenerates the launchd jobs."
+  },
+
+  "sources": {
+    "jira": {
+      "enabled": true,
+      "site": "your-site.atlassian.net",
+      "browse_base": "https://your-site.atlassian.net/browse/",
+      "jql_recent": "assignee = currentUser() AND updated >= \"-{lookback_hours}h\" ORDER BY updated DESC",
+      "jql_in_progress": "assignee = currentUser() AND statusCategory = \"In Progress\" ORDER BY priority ASC, updated DESC",
+      "fields": ["summary", "status", "issuetype", "priority", "updated"],
+      "in_progress_max_age_days": 14,
+      "include_sprint": false,
+      "_include_sprint_note": "OFF by default. When true (or asked on demand), bucket lines carry the active sprint name."
+    },
+    "github": { "enabled": true },
+    "claude-sessions": { "enabled": true, "max_sessions": 25, "min_user_turns": 2 },
+    "gcal": {
+      "enabled": true,
+      "exclude": ["Out of office", "Lunch", "Focus time"],
+      "_exclude_note": "Substring match, case-insensitive. Add your daily ceremonies here so they don't clutter the (Calls: …) line."
+    }
+  },
+
+  "sinks": {
+    "slack-canvas": { "enabled": false, "canvas_id": "F00000000" },
+    "slack-channel": { "enabled": false, "channel_id": "C00000000" },
+    "file": { "enabled": true }
+  },
+
+  "flavors": {
+    "_note": "Per-connector transport choice, written by /standup-ghost:setup after probing what exists on this machine (and asking you when more than one works). atlassian: local|claudeai. github: cli (gh) | mcp (GitHub MCP server).",
+    "atlassian": null,
+    "github": null,
+    "slack": null,
+    "gcal": null
+  },
+
+  "format": {
+    "heading": "## :calendar: {DOW} {DATE} — {handle}",
+    "max_bullets_per_block": 4,
+    "buckets_hint": [],
+    "lookback_hours": 36,
+    "lookback_hours_monday": 84
+  },
+
+  "absence": {
+    "auto_skip": true,
+    "_note": "Skip the run on non-working days and stretch the next run's lookback to the last working day. Weekends are already non-working via schedule.days; the rest comes from your calendar.",
+    "event_types": ["OUT_OF_OFFICE"],
+    "_event_types_note": "Google Calendar native event types treated as absence (OUT_OF_OFFICE covers the built-in out-of-office block).",
+    "event_patterns": ["out of office", "ooo", "on leave", "sick leave", "sick day", "vacation", "holiday"],
+    "_event_patterns_note": "Case-insensitive substring match on ALL-DAY / full-window event titles — catches leave/sick/holiday events that aren't typed OUT_OF_OFFICE.",
+    "holiday_calendar_ids": [],
+    "_holiday_note": "Extra calendar IDs to check for all-day events (e.g. your company-holidays calendar). Any all-day event there = non-working day.",
+    "max_lookback_days": 14
+  },
+
+  "behavior": {
+    "review_mode": false,
+    "notify_on_post": false,
+    "min_content_bullets": 1,
+    "pending_max_age_days": 7,
+    "alarm_threshold_days": 2,
+    "allow_unreviewed_cards": false
+  }
+}

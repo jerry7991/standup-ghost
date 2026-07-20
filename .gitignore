@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+*.log
+*.local.json
+.scan-patterns.local
+test/tmp/

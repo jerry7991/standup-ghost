@@ -1,0 +1,11 @@
+{
+  "name": "standup-ghost",
+  "displayName": "Standup Ghost",
+  "version": "0.1.0",
+  "description": "Never write a standup again. Composes and posts your daily standup from what you actually did — Jira, GitHub, Claude Code sessions, Google Calendar — on a schedule, unattended.",
+  "author": { "name": "Anup Kumar Singh", "url": "https://github.com/jerry7991" },
+  "homepage": "https://github.com/jerry7991/standup-ghost",
+  "repository": "https://github.com/jerry7991/standup-ghost",
+  "license": "MIT",
+  "keywords": ["standup", "automation", "slack", "jira", "daily-report"]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "standup-ghost",
+  "owner": { "name": "Anup Kumar Singh", "url": "https://github.com/jerry7991" },
+  "plugins": [
+    {
+      "name": "standup-ghost",
+      "source": "./",
+      "description": "Never write a standup again — composes and posts your daily standup from Jira, GitHub, Claude Code sessions, and Google Calendar."
+    }
+  ]
+}
