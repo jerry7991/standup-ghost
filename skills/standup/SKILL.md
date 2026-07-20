@@ -28,6 +28,7 @@ Execute each `cards/sources/*.md` fetch recipe with the computed window. A dark 
 ## Step 3 — Compose (format v2 — terse, bucketized)
 1. Merge by ticket key (branch `PROJ-42-*` + PR title + ticket = ONE item).
 2. Two blocks only — **Yesterday** (outcomes) / **Today** (intent). One line per initiative bucket (`format.buckets_hint` + derived), max `format.max_bullets_per_block` bucket lines; meetings without a ticket in ONE bracketed `(Calls: …)` line per block. Every ticket/PR is a link. No Blockers block, no tables, no sub-bullets.
+   **Reviews are ACTIVITY, not a queue:** report only reviews the user actually gave (`Reviews: repo#1 (approved), repo#2 (comments)`) and feedback they addressed on their own PRs (`addressed review feedback on repo#3` — folds into that PR's bucket line). NEVER report "N PRs awaiting my review" — pending queues aren't standup content.
 3. Heading: `format.heading` with `{DOW} {DATE}` from `date`, `{handle}` from config.
 4. **Min-content gate:** fewer than `behavior.min_content_bullets` real bullets ⇒ write `held` pending (never auto-posts) + note; STOP.
 5. **Review mode** (`behavior.review_mode`): deliver the draft to your own Slack DM (slack-channel card transport), write `held`, STOP. Approval = `/standup-ghost:standup post`.
