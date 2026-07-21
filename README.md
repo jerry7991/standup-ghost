@@ -102,7 +102,9 @@ Copy `config.example.json` to `~/.config/standup-ghost/config.json` (setup does 
 - **Powered-off days:** launchd fires a missed run when the Mac *wakes*, but not if it was *off* at trigger time. Off all day = skipped day (the watchdog will tell you).
 - **Slack canvas API drift (2026-07-16):** parameterless prepend was rejected; replace-without-section-id wipes canvases. The canvas card encodes the current verified semantics and read-back-verifies every write. If Slack drifts again, file an issue with the error.
 - **Notifications:** macOS may silently suppress `osascript` notifications until you allow them (System Settings → Notifications). Setup fires a test one and asks if you saw it.
-- **Headless connectors:** scheduled runs use `claude -p` *without* `--bare` so your authenticated connectors load. If a connector is dark headless-only, the pending fallback holds your standup and the alarm tells you.
+- **Headless connectors (READ THIS if scheduled Slack posts aren't landing):** the scheduled `claude -p` run **cannot authenticate interactive claude.ai connectors** (Slack, Google Calendar, Atlassian) — they work when you run interactively but go dark on a schedule. Sources degrade gracefully (thinner bullets + a flag); a dark Slack **sink** means nothing posts (held as `failed` pending, alarm fires). Fix: use a **token flavor** — the transport that needs no interactive OAuth, exactly like the github `cli` flavor.
+  - **Slack (`flavors.slack: "token"`):** put a bot token in `~/.config/standup-ghost/secrets.json` (`chmod 600`, copy `secrets.example.json`) with scopes `canvases:read`+`canvases:write` (canvas) / `chat:write` (channel); the bot must be a member of the canvas/channel. Delivery then goes through `runtime/lib/slack.js` over the Slack Web API — proven headless. `claudeai` stays available for interactive-only use.
+  - Google Calendar has no token flavor yet — headless runs fall back to a weekday-only working-day gate. Jira dark headless just thins content.
 - **`gh search` quoting:** the positional `org:… updated:…` form breaks; the github card uses flag form only.
 
 ## Contributing a card
@@ -112,7 +114,7 @@ A new source or sink = **one markdown file** — read `cards/CONTRACT.md`. The `
 ## Development
 
 ```bash
-node --test test/*.test.js   # 28 unit tests
+node --test test/*.test.js   # 36 unit tests
 zsh test/run-smoke.sh        # runner/watchdog smoke with mocked claude
 ./scripts/scan-identifiers.sh  # release gate: no private identifiers ship
 ```

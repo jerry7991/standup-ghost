@@ -3,16 +3,28 @@ kind: sink
 name: slack-channel
 connector: slack
 reviewed: true
-tools: [mcp__claude_ai_Slack__slack_send_message]
+flavors: [claudeai, token]
+tools-claudeai: [mcp__claude_ai_Slack__slack_send_message]
+cli: [node]
 requires-config: sinks.slack-channel.channel_id
 ---
 
 # Sink: Slack channel message (team updates channel)
 
-## Probe
-Tool available + `sinks.slack-channel.channel_id` set. Post failures ⇒ `failed` pending.
+**Transport** — shares `flavors.slack` with the canvas sink: `claudeai` (interactive connector, dark in headless) or `token` (Slack Web API via `slack_bot_token`, proven headless — scope `chat:write`, bot must be in the channel). Pick `token` for scheduled delivery.
 
-## Deliver
+## Probe
+- `claudeai`: tool available + `sinks.slack-channel.channel_id` set.
+- `token`: `slack_bot_token` in secrets + `channel_id` set.
+Post failures ⇒ `failed` pending.
+
+## Deliver — `token` flavor (headless)
+```bash
+node <runtime>/lib/slack.js channel-post --channel <sinks.slack-channel.channel_id> --body-file <tmpfile> [--ts <receipt.ts>]
+```
+Fresh post when no `ts`; a same-day re-run passes the receipt's `ts` → `chat.update` (parity with the canvas replace, never a duplicate). Prints `{ts}` for the receipt. Non-zero exit ⇒ `failed` pending.
+
+## Deliver — `claudeai` flavor
 Post the composed standup as one message to the configured channel, prefixed with the dated heading line.
 
 ## Idempotency (streams can't be edited by re-insert — receipts carry the `ts`)

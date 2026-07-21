@@ -48,7 +48,7 @@
   },
 
   "flavors": {
-    "_note": "Per-connector transport choice, written by /standup-ghost:setup after probing what exists on this machine (and asking you when more than one works). atlassian: local|claudeai. github: cli (gh) | mcp (GitHub MCP server).",
+    "_note": "Per-connector transport choice, written by /standup-ghost:setup after probing what exists on this machine (and asking you when more than one works). atlassian: local|claudeai. github: cli (gh) | mcp (GitHub MCP server). slack: claudeai (interactive connector — DARK in headless/cron) | token (Slack Web API bot token in secrets.json — the headless-capable choice for scheduled posts).",
     "atlassian": null,
     "github": null,
     "slack": null,

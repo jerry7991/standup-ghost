@@ -25,6 +25,8 @@ Then ask only the genuinely personal choices: schedule, which sources/sinks to e
 ## 2 — Doctor pass + flavor resolution
 Run the doctor (below) inline. Critically: PROBE which connector flavor exists per card (`tools-local` vs `tools-claudeai` candidates) and write the winner into `config.flavors.<connector>`. Zero live sources or zero live sinks ⇒ STOP with remediation; do not schedule.
 
+**Slack transport (`flavors.slack`) — steer toward `token` for scheduled delivery.** The `claudeai` Slack connector cannot authenticate inside the headless `claude -p` run, so a schedule set to `claudeai` will compose but never post (held as `failed` pending). If the user wants the *scheduled* standup to land in Slack, resolve `token`: ask for a Slack bot token (scopes `canvases:read`+`canvases:write` for the canvas sink, `chat:write` for the channel sink; the bot must be a member of the canvas/channel), write it to `~/.config/standup-ghost/secrets.json` (`chmod 600`, from `secrets.example.json`), set `flavors.slack="token"`, and verify with a `canvases.sections.lookup` probe via `node lib/slack.js`. Only fall back to `claudeai` when the user explicitly accepts that Slack delivery will require an interactive `/standup-ghost:standup post` (file sink still archives headlessly).
+
 ## 3 — Dry-run + destination confirmation
 `/standup-ghost:standup dry-run` with real data. Show the composed standup AND each resolved destination by NAME (channel name, canvas title — not raw IDs). User confirms. Rejection ⇒ back to step 1 (state stays `configured`; doctor reports "setup incomplete").
 

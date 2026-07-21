@@ -3,4 +3,5 @@ node_modules/
 *.log
 *.local.json
 .scan-patterns.local
+secrets.json
 test/tmp/
