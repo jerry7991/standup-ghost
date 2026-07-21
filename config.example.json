@@ -82,5 +82,10 @@
     "pending_max_age_days": 7,
     "alarm_threshold_days": 2,
     "allow_unreviewed_cards": false
+  },
+
+  "notifications": {
+    "_note": "Failure alarms always fire a local macOS notification. Set ntfy_topic to ALSO get a phone push (free, no account) — pick an unguessable topic, install the ntfy app, and subscribe to it. The topic string is a shared secret (anyone who knows it can read your alerts), so make it random. Alarms carry counts/dates only, never ticket text.",
+    "ntfy_topic": ""
   }
 }

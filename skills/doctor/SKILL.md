@@ -10,6 +10,8 @@ Read-only except where it says so. Output: ONE table (component / status ✅⚠�
 ## Probes
 1. **Config** parses; required keys per enabled card (`requires-config`) present. Setup state — anything below `live` ⇒ "setup incomplete at <state>: <what's next>".
 2. **Sources & sinks** — run each enabled card's Probe section. For flavor-variant cards, RE-RESOLVE (probe both candidate tool sets via ToolSearch); if the resolved flavor changed, update `config.flavors` and say `🔧 healed`. Unreviewed cards in play ⇒ flag distinctly.
+   - **Allowlist sanity (silent-failure class):** run `node lib/allowlist.js` and confirm it lists the MCP tools of every enabled MCP-backed card. If it emits **core tools only**, the runner can't call Slack/Jira/Calendar and fails *silently* (file sink still receipts). Cause = cards dir not found; fix = `STANDUP_GHOST_CARDS_DIR`/`defaultCardsDir` resolving `<runtime>/cards`.
+   - **Connector liveness:** `claude mcp list` — any claude.ai connector at "Needs authentication" that an enabled card needs ⇒ ❌ with "open Claude Code → `/mcp` to re-auth <name>"; it can't self-re-auth headless.
 3. **Scheduler liveness** (the no-run failure class — nothing else can see it):
    - Jobs loaded: attempt `launchctl print gui/$(id -u)/com.standup-ghost.daily` (+ `.watchdog`); on managed deny, hand the user the command and parse pasted output.
    - Plists present in `~/Library/LaunchAgents/` and content matches a fresh render (schedule drift ⇒ offer regenerated paste).

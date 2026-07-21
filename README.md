@@ -95,14 +95,16 @@ Copy `config.example.json` to `~/.config/standup-ghost/config.json` (setup does 
 | `absence.*` | OOO event types, leave/sick/holiday title patterns, company-holiday calendar IDs, `auto_skip` |
 | `format.*` | Heading, bucket hints, max lines, lookback floors |
 | `behavior.*` | `review_mode` (draft-to-DM before posting), `notify_on_post`, min-content gate, pending expiry, alarm threshold |
+| `notifications.ntfy_topic` | Optional free phone push for failure alarms (via [ntfy.sh](https://ntfy.sh)) — no account/token. Empty ⇒ local macOS notification only. |
 
 ## Gotchas (battle-tested, dated — read before filing an issue)
 
 - **launchd + TCC (2026-07-16):** background jobs cannot read `~/Desktop`/`~/Documents`. The runtime lives in `~/.local/share/standup-ghost` — never move it to Desktop.
 - **Powered-off days:** launchd fires a missed run when the Mac *wakes*, but not if it was *off* at trigger time. Off all day = skipped day (the watchdog will tell you).
 - **Slack canvas API drift (2026-07-16):** parameterless prepend was rejected; replace-without-section-id wipes canvases. The canvas card encodes the current verified semantics and read-back-verifies every write. If Slack drifts again, file an issue with the error.
-- **Notifications:** macOS may silently suppress `osascript` notifications until you allow them (System Settings → Notifications). Setup fires a test one and asks if you saw it.
-- **Headless connectors:** scheduled runs use `claude -p` *without* `--bare` so your authenticated connectors load. If a connector is dark headless-only, the pending fallback holds your standup and the alarm tells you.
+- **Notifications:** macOS may silently suppress `osascript` notifications until you allow them (System Settings → Notifications). Setup fires a test one and asks if you saw it. Set `notifications.ntfy_topic` for a phone push that doesn't depend on being at the Mac.
+- **Cards path / empty allowlist (2026-07-21):** the runner generates `--allowedTools` from the enabled cards. If the allowlist generator can't find the cards dir it emits **core tools only** — every Slack/Jira/Calendar MCP call is then denied headless, *silently* (the file sink still writes a receipt, so no alarm). Fixed: `allowlist.js` resolves both the install (`<runtime>/cards`) and repo (`<repo>/cards`) layouts, and `run.sh` exports `STANDUP_GHOST_CARDS_DIR`. Sanity check: `node runtime/lib/allowlist.js` must list your MCP tools.
+- **Headless connectors:** the claude.ai connectors (Slack/Jira/Calendar) DO work under `claude -p` when authenticated — but they lapse to "Needs authentication" and can't self-re-auth headless. The runner preflights `claude mcp list` and alarms which connector needs `/mcp`; a failed sink is held to pending and now alarms **same-day** (per-sink), not only after the multi-day backlog threshold.
 - **`gh search` quoting:** the positional `org:… updated:…` form breaks; the github card uses flag form only.
 
 ## Contributing a card
@@ -112,7 +114,7 @@ A new source or sink = **one markdown file** — read `cards/CONTRACT.md`. The `
 ## Development
 
 ```bash
-node --test test/*.test.js   # 28 unit tests
+node --test test/*.test.js   # 31 unit tests
 zsh test/run-smoke.sh        # runner/watchdog smoke with mocked claude
 ./scripts/scan-identifiers.sh  # release gate: no private identifiers ship
 ```
