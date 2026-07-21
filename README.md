@@ -1,6 +1,6 @@
 # 👻 Standup Ghost
 
-**Never write a standup again.** A Claude Code plugin that composes and posts your daily standup from what you *actually did* — your Jira tickets, your GitHub PRs, your Claude Code sessions, your calendar — every working day, unattended.
+**Never write a standup again.** A Claude Code plugin that composes and posts your daily standup from what you *actually did* — Jira tickets, GitHub PRs, Claude Code sessions, calendar — every working day, unattended.
 
 > ⚠️ **macOS-only in v1** (the scheduler is launchd). Linux/Windows: the pipeline works interactively; contribute a scheduler card!
 
@@ -19,6 +19,26 @@
 ```
 
 Terse by design: two blocks, one line per initiative, meetings without a ticket in brackets, everything linked, **no Blockers section**. All knobs in config.
+
+## Features
+
+What the plugin actually does for you:
+
+| Capability | Detail |
+|---|---|
+| **Pulls from 4 sources** | Jira (your JQLs), GitHub (`gh` CLI *or* GitHub MCP), Claude Code sessions, Google Calendar — each source is optional and independently toggled |
+| **Merges by ticket key** | Branch `PROJ-42-*` + its PR + the Jira ticket collapse into one line, so a single piece of work reads as a single initiative |
+| **Reviews as activity, not a queue** | Reports reviews you *gave* and feedback you *addressed* — never "N PRs awaiting your review" |
+| **Working-day aware** | Weekends, OOO, sick leave, vacation, and company holidays (read from your calendar) skip the run cleanly; the next run's "Yesterday" stretches back to your last real working day |
+| **Posts to 3 sinks** | Slack canvas (multi-writer safe, replace-not-duplicate), Slack channel (edits via `ts`, backlog collapsed to one message), local file archive — enable any combination |
+| **Never loses a standup** | A failed delivery becomes typed *pending* and is flushed on the next success; a composed standup is never dropped |
+| **Runs unattended** | launchd fires it on your schedule; an independent watchdog catches version drift, no-post days, and stuck pending |
+| **Fails loudly** | Per-sink same-day failure alarms via macOS notification, plus optional free phone push ([ntfy.sh](https://ntfy.sh)). Silent failure is a designed-out state |
+| **Review mode** | Optionally drafts to your own Slack DM first; you approve with `post` before anything goes public |
+| **Recap your history** | On-demand month/quarter/half/date-range TLDRs and keyword search across everything you've shipped — appraisal fuel from your local archive |
+| **Self-diagnosing** | `doctor` gives one table with exact remediations: card availability, connector flavors, scheduler liveness, receipt age, pending backlog, pause/resume |
+| **Extensible** | A new source or sink is *one markdown file* against `cards/CONTRACT.md` — zero core changes |
+| **Privacy-safe** | Alarms carry counts and dates only, never ticket text; nothing recap-related ever auto-posts |
 
 ## How it works
 
@@ -54,7 +74,7 @@ flowchart LR
 ## Install
 
 Prerequisites (the doctor checks all of this and tells you exactly what's missing):
-- Claude Code with the connectors you want: Slack (canvas/channel), Atlassian (Jira), Google Calendar — each is its own OAuth, budget a few minutes apiece
+- Claude Code with the connectors you want: Slack (canvas/channel), Atlassian (Jira), Google Calendar — each is its own OAuth
 - GitHub lane: **your choice** of `gh` CLI *or* the GitHub MCP server (setup probes both and asks)
 - `node` ≥ 20
 
@@ -71,22 +91,22 @@ Then, inside Claude Code:
 
 The wizard collects your config, probes which connector flavors your machine has, dry-runs with your real data (showing exactly where it will post, by name), makes the first real post, and hands you ONE paste to install the schedule. Setup only declares itself done after a real calendar-fired run has posted.
 
-## Daily verbs
+## Commands
 
-| Verb | What |
+| Command | What |
 |---|---|
 | `/standup-ghost:standup` | Full run (the scheduler calls this) |
 | `/standup-ghost:standup dry-run` | Compose only, write to the local file sink |
 | `/standup-ghost:standup post` | Approve today's held draft (review mode) |
 | `/standup-ghost:doctor` | Full diagnosis — one table, exact remediations |
-| `/standup-ghost:doctor pause` / `resume` | Going on leave without calendar events? Pause cleanly. |
-| `/standup-ghost:recap month` (or `quarter`, `half`, `2026-01-01..2026-03-31`) | TLDR of what you shipped — built from your local archive; appraisal season in one command |
+| `/standup-ghost:doctor pause` / `resume` | Pause cleanly when going on leave without calendar events |
+| `/standup-ghost:recap month` (or `quarter`, `half`, `2026-01-01..2026-03-31`) | TLDR of what you shipped, from your local archive |
 | `/standup-ghost:recap find <query>` | Search your work history: when/where a topic appeared, dated + linked |
-| `/standup-ghost:recap team` / `recap sprint` | On-demand only: team digest read from the shared canvas / current-sprint slice. Nothing recap-related ever runs automatically or auto-posts. |
+| `/standup-ghost:recap team` / `recap sprint` | On-demand team digest / current-sprint slice. Never runs automatically. |
 
 ## Configuration
 
-Copy `config.example.json` to `~/.config/standup-ghost/config.json` (setup does this for you). Highlights:
+Copy `config.example.json` to `~/.config/standup-ghost/config.json` (setup does this for you). Key sections:
 
 | Key | Meaning |
 |---|---|
@@ -94,18 +114,8 @@ Copy `config.example.json` to `~/.config/standup-ghost/config.json` (setup does 
 | `sources.*` / `sinks.*` | Enable flags + per-card settings (JQLs, canvas/channel IDs) |
 | `absence.*` | OOO event types, leave/sick/holiday title patterns, company-holiday calendar IDs, `auto_skip` |
 | `format.*` | Heading, bucket hints, max lines, lookback floors |
-| `behavior.*` | `review_mode` (draft-to-DM before posting), `notify_on_post`, min-content gate, pending expiry, alarm threshold |
+| `behavior.*` | `review_mode`, `notify_on_post`, min-content gate, pending expiry, alarm threshold |
 | `notifications.ntfy_topic` | Optional free phone push for failure alarms (via [ntfy.sh](https://ntfy.sh)) — no account/token. Empty ⇒ local macOS notification only. |
-
-## Gotchas (battle-tested, dated — read before filing an issue)
-
-- **launchd + TCC (2026-07-16):** background jobs cannot read `~/Desktop`/`~/Documents`. The runtime lives in `~/.local/share/standup-ghost` — never move it to Desktop.
-- **Powered-off days:** launchd fires a missed run when the Mac *wakes*, but not if it was *off* at trigger time. Off all day = skipped day (the watchdog will tell you).
-- **Slack canvas API drift (2026-07-16):** parameterless prepend was rejected; replace-without-section-id wipes canvases. The canvas card encodes the current verified semantics and read-back-verifies every write. If Slack drifts again, file an issue with the error.
-- **Notifications:** macOS may silently suppress `osascript` notifications until you allow them (System Settings → Notifications). Setup fires a test one and asks if you saw it. Set `notifications.ntfy_topic` for a phone push that doesn't depend on being at the Mac.
-- **Cards path / empty allowlist (2026-07-21):** the runner generates `--allowedTools` from the enabled cards. If the allowlist generator can't find the cards dir it emits **core tools only** — every Slack/Jira/Calendar MCP call is then denied headless, *silently* (the file sink still writes a receipt, so no alarm). Fixed: `allowlist.js` resolves both the install (`<runtime>/cards`) and repo (`<repo>/cards`) layouts, and `run.sh` exports `STANDUP_GHOST_CARDS_DIR`. Sanity check: `node runtime/lib/allowlist.js` must list your MCP tools.
-- **Headless connectors:** the claude.ai connectors (Slack/Jira/Calendar) DO work under `claude -p` when authenticated — but they lapse to "Needs authentication" and can't self-re-auth headless. The runner preflights `claude mcp list` and alarms which connector needs `/mcp`; a failed sink is held to pending and now alarms **same-day** (per-sink), not only after the multi-day backlog threshold.
-- **`gh search` quoting:** the positional `org:… updated:…` form breaks; the github card uses flag form only.
 
 ## Contributing a card
 
@@ -114,11 +124,26 @@ A new source or sink = **one markdown file** — read `cards/CONTRACT.md`. The `
 ## Development
 
 ```bash
-node --test test/*.test.js   # 31 unit tests
-zsh test/run-smoke.sh        # runner/watchdog smoke with mocked claude
+node --test test/*.test.js     # 31 unit tests
+zsh test/run-smoke.sh          # runner/watchdog smoke with mocked claude
 ./scripts/scan-identifiers.sh  # release gate: no private identifiers ship
 ```
 
 The scan gate ships only generic patterns. Put YOUR company/personal strings (org names, channel/canvas IDs, emails) in `~/.config/standup-ghost/private-patterns.txt` — one regex per line, part of your local profile, never committed. `.scan-patterns.local` works repo-locally (gitignored) too.
+
+## Gotchas (battle-tested, dated)
+
+<details>
+<summary>Operational notes worth reading before filing an issue</summary>
+
+- **launchd + TCC (2026-07-16):** background jobs cannot read `~/Desktop`/`~/Documents`. The runtime lives in `~/.local/share/standup-ghost` — never move it to Desktop.
+- **Powered-off days:** launchd fires a missed run when the Mac *wakes*, but not if it was *off* at trigger time. Off all day = skipped day (the watchdog will tell you).
+- **Slack canvas API drift (2026-07-16):** parameterless prepend was rejected; replace-without-section-id wipes canvases. The canvas card encodes the current verified semantics and read-back-verifies every write. If Slack drifts again, file an issue with the error.
+- **Notifications:** macOS may silently suppress `osascript` notifications until you allow them (System Settings → Notifications). Setup fires a test one and asks if you saw it. Set `notifications.ntfy_topic` for a phone push that doesn't depend on being at the Mac.
+- **Cards path / empty allowlist (2026-07-21):** the runner generates `--allowedTools` from the enabled cards. If the generator can't find the cards dir it emits **core tools only** — every Slack/Jira/Calendar MCP call is then denied headless, *silently*. Fixed: `allowlist.js` resolves both install (`<runtime>/cards`) and repo (`<repo>/cards`) layouts, and `run.sh` exports `STANDUP_GHOST_CARDS_DIR`. Sanity check: `node runtime/lib/allowlist.js` must list your MCP tools.
+- **Headless connectors:** the claude.ai connectors (Slack/Jira/Calendar) DO work under `claude -p` when authenticated — but they lapse to "Needs authentication" and can't self-re-auth headless. The runner preflights `claude mcp list` and alarms which connector needs `/mcp`; a failed sink is held to pending and alarms **same-day** (per-sink).
+- **`gh search` quoting:** the positional `org:… updated:…` form breaks; the github card uses flag form only.
+
+</details>
 
 MIT © [jerry7991](https://github.com/jerry7991)
