@@ -8,15 +8,27 @@ export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 RUNTIME_DIR="${STANDUP_GHOST_RUNTIME_DIR:-$HOME/.local/share/standup-ghost/runtime}"
 STATE_DIR="${STANDUP_GHOST_STATE_DIR:-$HOME/.local/state/standup-ghost}"
+CONFIG_DIR="${STANDUP_GHOST_CONFIG_DIR:-$HOME/.config/standup-ghost}"
 SHARE_DIR="$(dirname "$RUNTIME_DIR")"
 LOG="$HOME/Library/Logs/standup-ghost.log"
 CLAUDE_BIN="${STANDUP_GHOST_CLAUDE_BIN:-claude}"
 MAX_TURNS="${STANDUP_GHOST_MAX_TURNS:-60}"
 LOCK="$STATE_DIR/.run-lock"
 
-notify() { # $1 = static text; counts/dates only
+# Cards ship inside the runtime bundle; make the allowlist generator find them
+# regardless of its default-path logic (the install-layout bug that silently
+# produced an MCP-less allowlist — every Slack/Jira/Calendar call then denied).
+[[ -d "$RUNTIME_DIR/cards" ]] && export STANDUP_GHOST_CARDS_DIR="${STANDUP_GHOST_CARDS_DIR:-$RUNTIME_DIR/cards}"
+
+# Optional phone push (config.notifications.ntfy_topic) so failures reach the
+# user even away from the Mac — the alarm channel must NOT depend on a data
+# connector (the thing that may be down). Empty ⇒ local osascript only.
+NTFY_TOPIC="$(node -p "try{(require('$CONFIG_DIR/config.json').notifications||{}).ntfy_topic||''}catch(e){''}" 2>/dev/null || true)"
+
+notify() { # $1 = static text; counts/dates only (never ticket/event text)
   [[ "${STANDUP_GHOST_NO_NOTIFY:-0}" == "1" ]] && { echo "NOTIFY: $1"; return; }
   osascript -e "display notification \"$1\" with title \"Standup Ghost\"" 2>/dev/null || true
+  [[ -n "$NTFY_TOPIC" ]] && curl -fsS -m 10 -H "Title: Standup Ghost" -d "$1" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null 2>&1 || true
 }
 
 {
@@ -50,6 +62,15 @@ notify() { # $1 = static text; counts/dates only
     fi
   fi
 
+  # --- connector-liveness preflight (claude.ai connectors lapse to "Needs
+  # authentication" and can't self-re-auth headless) — warn early which one
+  # needs /mcp, so a dark lane isn't a silent surprise. Best-effort. ---
+  LAPSED="$("$CLAUDE_BIN" mcp list 2>/dev/null | grep -i 'Needs authentication' | sed -E 's/:.*//; s/^ *//' | paste -sd, - || true)"
+  if [[ -n "$LAPSED" ]]; then
+    echo "connectors need re-auth: $LAPSED"
+    notify "Connector needs re-auth (open Claude Code, run /mcp): $LAPSED"
+  fi
+
   # --- the run (LLM stage; allowlist generated from enabled cards) ---
   ALLOW="$(node lib/allowlist.js)" || { notify "Allowlist composition failed — run /standup-ghost:doctor"; exit 1; }
   "$CLAUDE_BIN" -p "/standup-ghost:standup — scheduled unattended run. Follow the skill end-to-end: working-day gate first, then collect, compose, deliver. Never wait for user input." \
@@ -60,6 +81,8 @@ notify() { # $1 = static text; counts/dates only
   echo "status: $STATUS"
   TODAY_OK="$(node -p "(${STATUS}).today_receipt")"
   FAILED_DAYS="$(node -p "(${STATUS}).pending_failed_days")"
+  TODAY_FAILED="$(node -p "((${STATUS}).today_failed_sinks||[]).join(',')")"
+  TODAY_FAILED_N="$(node -p "((${STATUS}).today_failed_sinks||[]).length")"
   CORRUPT="$(node -p "(${STATUS}).state_corrupt")"
   THRESHOLD="$(node -p "(${STATUS}).alarm_threshold_days")"
   NOTIFY_ON_POST="$(node -p "(${STATUS}).notify_on_post")"
@@ -68,6 +91,10 @@ notify() { # $1 = static text; counts/dates only
     notify "State corrupted — delivery held. Run /standup-ghost:doctor"
   elif [[ "$TODAY_OK" != "true" ]]; then
     notify "Today's standup did NOT post — run /standup-ghost:doctor"
+  elif (( TODAY_FAILED_N > 0 )); then
+    # A sink failed TODAY even though another succeeded — alarm same-day
+    # instead of waiting for the multi-day backlog threshold (the old masking).
+    notify "Today's standup failed to post to: $TODAY_FAILED — connector may need /mcp; then /standup-ghost:standup post"
   elif (( FAILED_DAYS >= THRESHOLD )); then
     notify "$FAILED_DAYS day(s) of standups stuck in pending — run /standup-ghost:doctor"
   elif [[ "$NOTIFY_ON_POST" == "true" ]]; then

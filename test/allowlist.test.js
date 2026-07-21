@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { compose, CORE_TOOLS } = require('../runtime/lib/allowlist');
+const { compose, CORE_TOOLS, defaultCardsDir } = require('../runtime/lib/allowlist');
 
 const write = (dir, name, text) => { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, name), text); };
 const fm = (lines) => `---\n${lines.join('\n')}\n---\n`;
@@ -53,4 +53,20 @@ test('unresolved flavor degrades: card excluded, run proceeds with the rest', ()
   assert.ok(!r.allow.includes('Atlassian'));
   assert.ok(r.allow.includes('mcp__claude_ai_Slack__slack_update_canvas'));
   assert.ok(r.excluded.some((e) => e.reason.includes('flavor unresolved')));
+});
+
+// Regression: the install layout (cards INSIDE runtime) must resolve, else the
+// generated allowlist silently drops every MCP tool. Prefer <runtime>/cards.
+test('defaultCardsDir prefers <runtime>/cards, falls back to <repo>/cards', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sg-layout-'));
+  const libDir = path.join(root, 'runtime', 'lib');          // stands in for __dirname
+  const runtimeCards = path.join(root, 'runtime', 'cards');  // install layout
+  const repoCards = path.join(root, 'cards');                // repo layout
+  fs.mkdirSync(libDir, { recursive: true });
+  fs.mkdirSync(repoCards, { recursive: true });
+  // Only repo/cards exists → fall back to it.
+  assert.strictEqual(defaultCardsDir(libDir), repoCards);
+  // Now install layout exists → prefer runtime/cards.
+  fs.mkdirSync(runtimeCards, { recursive: true });
+  assert.strictEqual(defaultCardsDir(libDir), runtimeCards);
 });

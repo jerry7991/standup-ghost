@@ -18,8 +18,14 @@ if (verb === 'skipped-receipt') {
   state.pruneReceipts();
   const pendingFailedDays = new Set(state.listPending().filter((p) => p.type === 'failed').map((p) => p.date)).size;
   const todaysReceipts = state.listReceipts().filter((r) => r.date === today() && r.provenance !== 'expired');
+  // Per-sink truth: a sink that failed TODAY must alarm same-day, even when
+  // another sink (e.g. file) succeeded — else `today_receipt` masks the failure.
+  const todayFailedSinks = [...new Set(
+    state.listPending().filter((p) => p.type === 'failed' && p.date === today()).map((p) => p.sink),
+  )];
   process.stdout.write(JSON.stringify({
     today_receipt: todaysReceipts.length > 0,
+    today_failed_sinks: todayFailedSinks,
     pending_failed_days: pendingFailedDays,
     state_corrupt: Boolean(state.getMarker('state-corrupt')),
     paused: Boolean(state.getMarker('paused')),
