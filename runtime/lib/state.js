@@ -116,11 +116,18 @@ function listReceipts() {
   return fs.readdirSync(RECEIPTS_DIR).filter((f) => f.endsWith('.json'))
     .map((f) => readJson(path.join(RECEIPTS_DIR, f))).filter(Boolean);
 }
+// Receipts predating `at` yield NaN, which poisons Math.max and mutes the alarm.
+function receiptStamp(r) {
+  for (const v of [r && r.at, r && r.date]) {
+    const t = +new Date(v);
+    if (Number.isFinite(t)) return t;
+  }
+  return null;
+}
 function lastReceiptAgeDays(now = new Date()) {
-  const rs = listReceipts();
-  if (!rs.length) return Infinity;
-  const newest = Math.max(...rs.map((r) => +new Date(r.at)));
-  return (now - newest) / DAY_MS;
+  const stamps = listReceipts().map(receiptStamp).filter((t) => t !== null);
+  if (!stamps.length) return Infinity;
+  return (now - Math.max(...stamps)) / DAY_MS;
 }
 function pruneReceipts(now = new Date()) {
   for (const r of listReceipts()) {
