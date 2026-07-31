@@ -6,6 +6,10 @@
 const state = require('./state');
 
 const today = () => new Date().toISOString().slice(0, 10);
+const ageDays = () => {
+  const a = state.lastReceiptAgeDays();
+  return Number.isFinite(a) ? Math.min(Number(a.toFixed(2)), 9999) : 9999;
+};
 const verb = process.argv[2];
 
 if (verb === 'skipped-receipt') {
@@ -29,7 +33,7 @@ if (verb === 'skipped-receipt') {
     pending_failed_days: pendingFailedDays,
     state_corrupt: Boolean(state.getMarker('state-corrupt')),
     paused: Boolean(state.getMarker('paused')),
-    last_receipt_age_days: Math.min(Number(state.lastReceiptAgeDays().toFixed(2)), 9999), // Infinity would JSON-null and mute the watchdog
+    last_receipt_age_days: ageDays(), // any non-finite value would JSON-null and mute the watchdog
     alarm_threshold_days: (config.behavior && config.behavior.alarm_threshold_days) || 2,
     notify_on_post: Boolean(config.behavior && config.behavior.notify_on_post),
   }));

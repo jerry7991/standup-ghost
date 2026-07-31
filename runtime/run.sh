@@ -10,9 +10,11 @@ RUNTIME_DIR="${STANDUP_GHOST_RUNTIME_DIR:-$HOME/.local/share/standup-ghost/runti
 STATE_DIR="${STANDUP_GHOST_STATE_DIR:-$HOME/.local/state/standup-ghost}"
 CONFIG_DIR="${STANDUP_GHOST_CONFIG_DIR:-$HOME/.config/standup-ghost}"
 SHARE_DIR="$(dirname "$RUNTIME_DIR")"
-LOG="$HOME/Library/Logs/standup-ghost.log"
+LOG="${STANDUP_GHOST_LOG:-$HOME/Library/Logs/standup-ghost.log}"
 CLAUDE_BIN="${STANDUP_GHOST_CLAUDE_BIN:-claude}"
 MAX_TURNS="${STANDUP_GHOST_MAX_TURNS:-60}"
+# Wall-clock cap on the LLM stage: --max-turns bounds turns, not time.
+STAGE_TIMEOUT="${STANDUP_GHOST_STAGE_TIMEOUT:-900}"
 LOCK="$STATE_DIR/.run-lock"
 
 # Cards ship inside the runtime bundle; make the allowlist generator find them
@@ -73,8 +75,19 @@ notify() { # $1 = static text; counts/dates only (never ticket/event text)
 
   # --- the run (LLM stage; allowlist generated from enabled cards) ---
   ALLOW="$(node lib/allowlist.js)" || { notify "Allowlist composition failed — run /standup-ghost:doctor"; exit 1; }
+  # Hard kill: a hung MCP call would block forever and starve the alarms below.
   "$CLAUDE_BIN" -p "/standup-ghost:standup — scheduled unattended run. Follow the skill end-to-end: working-day gate first, then collect, compose, deliver. Never wait for user input." \
-    --allowedTools "$ALLOW" --max-turns "$MAX_TURNS" 2>&1
+    --allowedTools "$ALLOW" --max-turns "$MAX_TURNS" 2>&1 &
+  STAGE_PID=$!
+  ( sleep "$STAGE_TIMEOUT"; kill -TERM "$STAGE_PID" 2>/dev/null; sleep 15; kill -KILL "$STAGE_PID" 2>/dev/null ) &
+  REAPER_PID=$!
+  wait "$STAGE_PID"; STAGE_RC=$?
+  kill "$REAPER_PID" 2>/dev/null; wait "$REAPER_PID" 2>/dev/null || true
+  STAGE_TIMED_OUT=0
+  if (( STAGE_RC >= 128 )); then
+    STAGE_TIMED_OUT=1
+    echo "LLM stage killed at ${STAGE_TIMEOUT}s wall clock (rc=$STAGE_RC) — suspect a hung MCP tool call"
+  fi
 
   # --- post-run status → notify / alarm (counts + dates only) ---
   STATUS="$(node lib/statecli.js status)"
@@ -90,7 +103,11 @@ notify() { # $1 = static text; counts/dates only (never ticket/event text)
   if [[ "$CORRUPT" == "true" ]]; then
     notify "State corrupted — delivery held. Run /standup-ghost:doctor"
   elif [[ "$TODAY_OK" != "true" ]]; then
-    notify "Today's standup did NOT post — run /standup-ghost:doctor"
+    if (( STAGE_TIMED_OUT )); then
+      notify "Standup timed out after $((STAGE_TIMEOUT / 60))m and did NOT post — run /standup-ghost:doctor"
+    else
+      notify "Today's standup did NOT post — run /standup-ghost:doctor"
+    fi
   elif (( TODAY_FAILED_N > 0 )); then
     # A sink failed TODAY even though another succeeded — alarm same-day
     # instead of waiting for the multi-day backlog threshold (the old masking).
