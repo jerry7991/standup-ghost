@@ -17,7 +17,7 @@ Two jobs: (1) meetings for the `(Calls: …)` line, (2) **absence detection** fo
 
 ## Fetch — absence detection (config: `absence.*`)
 For the run date and each day in the lookback window, a day is NON-WORKING when any of:
-- an event with `eventType` in `absence.event_types` (Google's native OUT_OF_OFFICE) covers it;
+- an **all-day, or full-working-day-spanning,** event with `eventType` in `absence.event_types` (Google's native OUT_OF_OFFICE) covers it. Google OOO events can be partial-day (specific hours) — a short OOO block (e.g. a 1-hour appointment) does NOT mark the whole day non-working. Only count it when the event is all-day, or its start/end span covers essentially the whole scheduled working day. A partial-day OOO that doesn't meet this bar is simply ignored for the working-day gate — it is not a meeting either (its `eventType` isn't `DEFAULT`), so it never appears in the `(Calls: …)` line;
 - an ALL-DAY / full-window event whose title matches `absence.event_patterns` (case-insensitive substring — catches "sick leave", "on leave", "vacation", "holiday");
 - any all-day event on a calendar in `absence.holiday_calendar_ids` (company-holiday calendars).
 
